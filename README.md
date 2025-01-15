@@ -73,7 +73,7 @@ Console.WriteLine($"Value: {value}");
 ### Write Memory
 
 ```csharp
-memory.Write(address, 12345);
+memory.Write<int>(address, 12345);
 ```
 
 ### Allocate Memory
