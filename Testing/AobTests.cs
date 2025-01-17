@@ -11,11 +11,11 @@ using System.Threading.Tasks;
 namespace Testing;
 
 [TestFixture]
-internal class Tests
+internal class AobTests
 {
     [Test]
     [Repeat(5_000)]
-    public void AobGeneralTest()
+    public unsafe void AobGeneralTest()
     {
         const int length = 0x2000;
         var pArr = Marshal.AllocHGlobal(length);
@@ -47,17 +47,14 @@ internal class Tests
             var results = mem.Search(pattern, pb0, pbn);
             foreach (var address in results)
             {
-                unsafe
-                {
-                    var offset = (int)(address - pArr);
+                var offset = (int)(address - pArr);
 
-                    for (var j = 0; j < pattern.Length; j++)
-                    {
-                        var patternByte = pattern[j].AsByte();
-                        var matchedByte = bytes[j + offset];
-                        var matches = pattern[j].Matches(matchedByte);
-                        Assert.That(matches, Is.True);
-                    }
+                for (var j = 0; j < pattern.Length; j++)
+                {
+                    var patternByte = pattern[j].AsByte();
+                    var matchedByte = bytes[j + offset];
+                    var matches = pattern[j].Matches(matchedByte);
+                    Assert.That(matches, Is.True);
                 }
             }
         }
