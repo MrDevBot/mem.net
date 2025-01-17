@@ -108,7 +108,8 @@ internal class Tests
             var pb0nint = new nint(pb0);
             Assert.Throws<ArgumentOutOfRangeException>(
                 () => mem.Search(pattern, pb0nint, pb0nint));
-            Assert.Throws<Exception>(() => mem.Search(pattern, pb0nint, pb0nint + 1));
+            Assert.Throws<ArgumentException>(
+                () => mem.Search(pattern, pb0nint, pb0nint + 1));
         }
     }
 }
