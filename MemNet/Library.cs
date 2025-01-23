@@ -222,7 +222,10 @@ public sealed class Memory : IDisposable
 
         if (chunkSize <= 0)
             throw new ArgumentOutOfRangeException(nameof(chunkSize), "Chunk size must be a positive value.");
-
+        
+        if (pattern.Length > chunkSize)
+            throw new ArgumentOutOfRangeException(nameof(pattern), "Pattern is too large for chunk size.");
+        
         var matches = new List<IntPtr>();
         long start = startAddress.ToInt64();
         long end = endAddress.ToInt64();
@@ -237,11 +240,11 @@ public sealed class Memory : IDisposable
             if (bytesToRead <= 0)
                 break;
 
-            byte[] data = Read((IntPtr)currentOffset, (int)bytesToRead);
+            var data = Read((IntPtr)currentOffset, (int)bytesToRead);
 
             for (int i = 0; i <= data.Length - patternLength; i++)
             {
-                bool match = true;
+                var match = true;
                 for (int j = 0; j < patternLength; j++)
                 {
                     if (pattern[j].Matches(data[i + j])) continue;
@@ -249,7 +252,6 @@ public sealed class Memory : IDisposable
                     match = false;
                     break;
                 }
-                
                 if (match)
                 {
                     matches.Add((IntPtr)(currentOffset + i));
