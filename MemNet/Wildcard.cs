@@ -11,6 +11,14 @@ public struct Wildcard
         _lowNibble = token[1] == '?' ? null : Convert.ToInt32(token[1].ToString(), 16);
     }
 
+    public byte? AsByte()
+    {
+        if (!_highNibble.HasValue || !_lowNibble.HasValue)
+            return null;
+
+        return (byte)((_highNibble.Value << 4) | _lowNibble.Value);
+    }
+
     public bool Matches(byte b)
     {
         int high = (b >> 4) & 0xF;

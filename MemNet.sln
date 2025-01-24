@@ -1,10 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Memlib", "MemNet\MemNet.csproj", "{CA5757C4-1576-4CE1-AD33-18C0A6E3BEEF}"
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35707.178 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemNet", "MemNet\MemNet.csproj", "{CA5757C4-1576-4CE1-AD33-18C0A6E3BEEF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{CB0F42DE-E293-4018-8BC0-0D82721A3717}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Reader", "Examples\Pattern Scanner\Pattern Scanner.csproj", "{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pattern Scanner", "Examples\Pattern Scanner\Pattern Scanner.csproj", "{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Testing", "Testing\Testing.csproj", "{24F0E9FF-1BDE-41E8-BE50-BE33D30AC3C6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +25,13 @@ Global
 		{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{24F0E9FF-1BDE-41E8-BE50-BE33D30AC3C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{24F0E9FF-1BDE-41E8-BE50-BE33D30AC3C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{24F0E9FF-1BDE-41E8-BE50-BE33D30AC3C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{24F0E9FF-1BDE-41E8-BE50-BE33D30AC3C6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1} = {CB0F42DE-E293-4018-8BC0-0D82721A3717}
