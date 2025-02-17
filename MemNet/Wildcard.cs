@@ -1,15 +1,9 @@
-﻿namespace Memlib;
+﻿namespace MemNet;
 
-public struct Wildcard
+public readonly struct Wildcard(string token)
 {
-    private readonly int? _highNibble; // null represents wildcard
-    private readonly int? _lowNibble;  // null represents wildcard
-
-    public Wildcard(string token)
-    {
-        _highNibble = token[0] == '?' ? null : Convert.ToInt32(token[0].ToString(), 16);
-        _lowNibble = token[1] == '?' ? null : Convert.ToInt32(token[1].ToString(), 16);
-    }
+    private readonly int? _highNibble = token[0] == '?' ? null : Convert.ToInt32(token[0].ToString(), 16); // null represents wildcard
+    private readonly int? _lowNibble = token[1] == '?' ? null : Convert.ToInt32(token[1].ToString(), 16);  // null represents wildcard
 
     public bool Matches(byte b)
     {
