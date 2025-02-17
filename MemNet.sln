@@ -4,7 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Memlib", "MemNet\MemNet.csp
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{CB0F42DE-E293-4018-8BC0-0D82721A3717}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Reader", "Examples\Pattern Scanner\Pattern Scanner.csproj", "{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PatternScanner", "Examples\PatternScanner\PatternScanner.csproj", "{36FA29A7-59CB-40EA-B2D2-066D7B9F08C1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
