@@ -1,4 +1,4 @@
-﻿namespace Memlib.Enum;
+﻿namespace MemNet.Enum;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedMember.Local

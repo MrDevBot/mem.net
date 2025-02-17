@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace Memlib.Native;
+namespace MemNet.Native;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedMember.Local

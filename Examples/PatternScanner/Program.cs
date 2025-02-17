@@ -1,8 +1,5 @@
 ﻿using System.Diagnostics;
-using Memlib;
-
-namespace Reader;
-
+using MemNet;
 using Serilog;
 
 static class Program

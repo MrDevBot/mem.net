@@ -1,11 +1,12 @@
 ﻿using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
-using Memlib.Enum;
-using Memlib.Native;
+using MemNet.Enum;
+using MemNet.Enum.Managed;
+using MemNet.Native;
 using Serilog;
 
-namespace Memlib;
+namespace MemNet;
 
 /// <summary>
 /// A class for reading and writing to the memory of another process.
