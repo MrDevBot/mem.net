@@ -2,6 +2,8 @@
 using MemNet;
 using Serilog;
 
+namespace PatternScanner;
+
 static class Program
 {
     private static ILogger Log = new LoggerConfiguration()
@@ -60,4 +62,6 @@ static class Program
         mem.Close();
     }
 
+
+    
 }
