@@ -11,7 +11,7 @@ static class Program
         .WriteTo.Console()
         .CreateLogger();
 
-    public static unsafe void Main()
+    public static void Main()
     {
         var processId = Process.GetProcessesByName("CS2").FirstOrDefault()!.Id;
 

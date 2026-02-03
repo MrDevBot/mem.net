@@ -71,11 +71,17 @@ public sealed class Memory : IDisposable
     /// </summary>
     /// <param name="existingHandle">An existing valid handle to the target process.</param>
     /// <exception cref="InvalidOperationException">Thrown if the process is already open.</exception>
+    /// <exception cref="ArgumentException">Thrown if the handle is invalid (zero or -1).</exception>
     public void Open(IntPtr existingHandle)
     {
         if (_processHandle != IntPtr.Zero)
         {
             throw new InvalidOperationException("Process already open. Close before hijacking another handle.");
+        }
+
+        if (existingHandle == IntPtr.Zero || existingHandle == new IntPtr(-1))
+        {
+            throw new ArgumentException("The provided handle is invalid.", nameof(existingHandle));
         }
 
         _processHandle = existingHandle;
@@ -169,7 +175,14 @@ public sealed class Memory : IDisposable
                     Type = (MemoryType)mbi.Type
                 };
 
-                long nextAddress = mbi.BaseAddress.ToInt64() + mbi.RegionSize;
+                long baseAddr = mbi.BaseAddress.ToInt64();
+                long regionSize = mbi.RegionSize.ToInt64();
+
+                // Check for overflow before addition
+                if (baseAddr > long.MaxValue - regionSize)
+                    break;
+
+                long nextAddress = baseAddr + regionSize;
                 if (nextAddress < 0) break;
                 address = (IntPtr)nextAddress;
             }
@@ -191,9 +204,15 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
-    public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8196)
+    public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
-        var patternTokens = pattern.Split(' ');
+        if (string.IsNullOrWhiteSpace(pattern))
+            throw new ArgumentNullException(nameof(pattern), "The search pattern cannot be null or empty.");
+
+        var patternTokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (patternTokens.Length == 0)
+            throw new ArgumentException("The search pattern contains no valid tokens.", nameof(pattern));
+
         var wildcards = patternTokens.Select(token => new Wildcard(token)).ToArray();
         return Search(wildcards, startAddress, endAddress, chunkSize);
     }
@@ -209,7 +228,7 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
-    public List<IntPtr> Search(Wildcard[] pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8196)
+    public List<IntPtr> Search(Wildcard[] pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
         if (_processHandle == IntPtr.Zero)
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
@@ -319,7 +338,7 @@ public sealed class Memory : IDisposable
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
         if (size <= 0)
-            throw new ArgumentOutOfRangeException(nameof(size), "Size must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(size), "Size must be positive.");
 
         byte[] buffer = new byte[size];
         GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
@@ -403,7 +422,7 @@ public sealed class Memory : IDisposable
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
         if (buffer.Length <= 0)
-            throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer length must be positive.");
 
         GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             

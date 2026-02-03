@@ -25,6 +25,6 @@ public enum ProcessAccessRights : uint
     PROCESS_SUSPEND_RESUME = 0x0800,
     PROCESS_GET_CONTEXT = 0x1000,
     PROCESS_SET_CONTEXT = 0x2000,
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x2000, // Introduced in Windows Server 2003
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000, // Introduced in Windows Vista
     PROCESS_ALL_ACCESS = 0x000F0000 | 0x001FFFFF
 }

@@ -25,7 +25,7 @@ public enum AllocationType : uint
     /// <summary>
     /// Indicates that the pages of the specified region should be protected for access by multiple processes.
     /// </summary>
-    MEM_SHARED = 0x00001000, // Note: This value overlaps with MEM_COMMIT in some contexts, careful usage is needed.
+    MEM_SHARED = 0x08000000,
 
     /// <summary>
     /// Allocates memory using large page support.
