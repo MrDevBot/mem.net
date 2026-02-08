@@ -237,7 +237,7 @@ public sealed class Memory : IDisposable
             throw new ArgumentNullException(nameof(pattern), "The search pattern cannot be null or empty.");
 
         if (startAddress.ToInt64() >= endAddress.ToInt64())
-            throw new ArgumentOutOfRangeException(nameof(startAddress), 
+            throw new ArgumentOutOfRangeException(nameof(startAddress),
                 "Start address must be less than end address.");
 
         if (chunkSize <= 0)
@@ -259,7 +259,19 @@ public sealed class Memory : IDisposable
             if (bytesToRead <= 0)
                 break;
 
-            var data = Read((IntPtr)currentOffset, (int)bytesToRead);
+            byte[] data;
+            try
+            {
+                data = Read((IntPtr)currentOffset, (int)bytesToRead);
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(
+                    "Search skipping unreadable region at 0x{Address:X16}: {Message}",
+                    currentOffset, ex.Message);
+                currentOffset += chunkSize;
+                continue;
+            }
 
             for (int i = 0; i <= data.Length - patternLength; i++)
             {
@@ -272,13 +284,16 @@ public sealed class Memory : IDisposable
                         break;
                     }
                 }
+
                 if (match)
                 {
                     matches.Add((IntPtr)(currentOffset + i));
                 }
             }
+
             currentOffset += chunkSize;
         }
+
         return matches;
     }
 
