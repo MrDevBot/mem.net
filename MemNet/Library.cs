@@ -148,15 +148,19 @@ public sealed class Memory : IDisposable
     }
 
     /// <summary>
-    /// Retrieves a list of modules loaded by the target process.
+    /// Retrieves a list of modules loaded by the target process by walking the PEB.
     /// </summary>
     /// <returns>A list of <see cref="ModuleInfo"/> objects.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="Win32Exception">Thrown if enumeration of modules fails.</exception>
+    /// <exception cref="NtStatusException">Thrown if enumeration of modules fails.</exception>
     public List<ModuleInfo> Modules()
     {
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+        lock (_lock)
+        {
+            EnsureOpen();
+            return EnumerateModulesViaPeb();
+        }
+    }
 
         var modules = new List<ModuleInfo>();
         IntPtr[] moduleHandles = new IntPtr[1024];
