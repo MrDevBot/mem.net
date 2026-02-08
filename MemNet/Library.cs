@@ -355,7 +355,7 @@ public sealed class Memory : IDisposable
             throw new ArgumentOutOfRangeException(nameof(pattern), "Pattern is too large for chunk size.");
         
         var regions = (from page in Query()
-                       where page.State == MemoryState.MEM_COMMIT && IsReadableProtection(page.Protect)
+                       where page.State == MemoryState.MEM_COMMIT && Readable(page.Protect)
                        let regionStart = page.BaseAddress.ToInt64()
                        let regionEnd = regionStart + (long)page.RegionSize
                        let clampedStart = Math.Max(regionStart, start)
@@ -439,6 +439,26 @@ public sealed class Memory : IDisposable
         }
 
         return matches;
+    }
+
+    /// <summary>
+    /// Determines whether a page protection value permits reading.
+    /// </summary>
+    private static bool Readable(MemoryProtection protect)
+    {
+        if ((protect & MemoryProtection.PAGE_GUARD) != 0)
+            return false;
+
+        var baseProtect = protect & ~(MemoryProtection.PAGE_GUARD |
+                                      MemoryProtection.PAGE_NOCACHE |
+                                      MemoryProtection.PAGE_WRITECOMBINE);
+
+        return baseProtect is MemoryProtection.PAGE_READONLY
+            or MemoryProtection.PAGE_READWRITE
+            or MemoryProtection.PAGE_WRITECOPY
+            or MemoryProtection.PAGE_EXECUTE_READ
+            or MemoryProtection.PAGE_EXECUTE_READWRITE
+            or MemoryProtection.PAGE_EXECUTE_WRITECOPY;
     }
 
     /// <summary>
