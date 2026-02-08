@@ -210,7 +210,7 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
-    public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8196)
+    public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
         var patternTokens = pattern.Split(' ');
         var wildcards = patternTokens.Select(token => new Wildcard(token)).ToArray();
