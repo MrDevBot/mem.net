@@ -599,42 +599,43 @@ public sealed class Memory : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Returns a pseudo-handle representing the current process.
+    /// NT equivalent of kernel32!GetCurrentProcess.
+    /// </summary>
+    private static IntPtr NtCurrentProcess() => -1;
+
     // ReSharper disable InconsistentNaming
 
-    [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
-    private static extern IntPtr OpenProcess(
-        uint desiredAccess,
-        [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
-        int processId
+    [DllImport("ntdll.dll", SetLastError = false)]
+    private static extern int NtClose(IntPtr Handle);
+
+    [DllImport("ntdll.dll", SetLastError = false)]
+    private static extern int NtDuplicateObject(
+        IntPtr SourceProcessHandle,
+        IntPtr SourceHandle,
+        IntPtr TargetProcessHandle,
+        out IntPtr TargetHandle,
+        uint DesiredAccess,
+        uint HandleAttributes,
+        uint Options
     );
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr hObject);
-
-    [DllImport("psapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool EnumProcessModulesEx(
-        IntPtr hProcess,
-        [Out] IntPtr[] lphModule,
-        uint cb,
-        out uint lpcbNeeded,
-        uint dwFilterFlag
+    [DllImport("ntdll.dll", SetLastError = false)]
+    private static extern int NtOpenProcess(
+        out IntPtr ProcessHandle,
+        uint DesiredAccess,
+        ref OBJECT_ATTRIBUTES ObjectAttributes,
+        ref CLIENT_ID ClientId
     );
 
-    [DllImport("psapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern uint GetModuleBaseName(
-        IntPtr hProcess,
-        IntPtr hModule,
-        [Out] StringBuilder lpBaseName,
-        uint nSize
-    );
-
-    [DllImport("psapi.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetModuleInformation(
-        IntPtr hProcess,
-        IntPtr hModule,
-        out MODULEINFO lpmodinfo,
-        uint cb
+    [DllImport("ntdll.dll", SetLastError = false)]
+    private static extern int NtQueryInformationProcess(
+        IntPtr ProcessHandle,
+        int ProcessInformationClass,
+        IntPtr ProcessInformation,
+        int ProcessInformationLength,
+        out int ReturnLength
     );
 
     [DllImport("ntdll.dll", SetLastError = false)]
@@ -681,6 +682,15 @@ public sealed class Memory : IDisposable
         ref IntPtr BaseAddress,
         ref IntPtr RegionSize,
         uint FreeType
+    );
+
+    [DllImport("ntdll.dll", SetLastError = false)]
+    private static extern int NtProtectVirtualMemory(
+        IntPtr ProcessHandle,
+        ref IntPtr BaseAddress,
+        ref IntPtr RegionSize,
+        uint NewProtect,
+        out uint OldProtect
     );
 
     // ReSharper restore InconsistentNaming
