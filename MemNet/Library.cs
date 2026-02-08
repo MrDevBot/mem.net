@@ -470,21 +470,25 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     public T Read<T>(IntPtr address) where T : struct
     {
-        _logger.Debug("Read {Type} from 0x{Address:X16}.", typeof(T), address);
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        int size = Marshal.SizeOf<T>();
-        byte[] buffer = Read(address, size);
-
-        GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-        try
+        lock (_lock)
         {
-            return Marshal.PtrToStructure<T>(gcHandle.AddrOfPinnedObject());
-        }
-        finally
-        {
-            gcHandle.Free();
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            _logger.Debug("Read {Type} from 0x{Address:X16}.", typeof(T), address);
+
+            int size = Marshal.SizeOf<T>();
+            byte[] buffer = Read(address, size);
+
+            GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                return Marshal.PtrToStructure<T>(gcHandle.AddrOfPinnedObject());
+            }
+            finally
+            {
+                gcHandle.Free();
+            }
         }
     }
 
