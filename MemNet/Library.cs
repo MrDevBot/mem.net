@@ -71,8 +71,12 @@ public sealed class Memory : IDisposable
     /// </summary>
     /// <param name="existingHandle">An existing valid handle to the target process.</param>
     /// <exception cref="InvalidOperationException">Thrown if the process is already open.</exception>
+    /// <exception cref="ArgumentException">Thrown if the provided handle is zero/invalid.</exception>
     public void Open(IntPtr existingHandle)
     {
+        if (existingHandle == IntPtr.Zero)
+            throw new ArgumentException("Handle cannot be zero.", nameof(existingHandle));
+
         if (_processHandle != IntPtr.Zero)
         {
             throw new InvalidOperationException("Process already open. Close before hijacking another handle.");
