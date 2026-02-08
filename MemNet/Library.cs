@@ -96,23 +96,55 @@ public sealed class Memory : IDisposable
     }
 
     /// <summary>
-    /// Hijacks an existing handle for the target process.
+    /// Uses an existing handle for the target process.
     /// </summary>
     /// <param name="existingHandle">An existing valid handle to the target process.</param>
+    /// <param name="duplicate">If true (default), duplicates the handle to prevent issues if the original is closed. 
+    /// If false, uses the handle directly (caller must ensure handle remains valid).</param>
     /// <exception cref="InvalidOperationException">Thrown if the process is already open.</exception>
     /// <exception cref="ArgumentException">Thrown if the provided handle is zero/invalid.</exception>
-    public void Open(IntPtr existingHandle)
+    /// <exception cref="NtStatusException">Thrown if handle duplication fails.</exception>
+    public void Open(IntPtr existingHandle, bool duplicate = true)
     {
         if (existingHandle == IntPtr.Zero)
             throw new ArgumentException("Handle cannot be zero.", nameof(existingHandle));
 
-        if (_processHandle != IntPtr.Zero)
+        lock (_lock)
         {
-            throw new InvalidOperationException("Process already open. Close before hijacking another handle.");
-        }
+            if (_processHandle != IntPtr.Zero)
+            {
+                throw new InvalidOperationException("Process already open. Close before using another handle.");
+            }
 
-        _processHandle = existingHandle;
-        _logger.Debug("Hijacked handle for process {ProcessId}.", _processId);
+            if (duplicate)
+            {
+                int status = NtDuplicateObject(
+                    NtCurrentProcess(),
+                    existingHandle,
+                    NtCurrentProcess(),
+                    out IntPtr duplicatedHandle,
+                    0,
+                    0,
+                    DUPLICATE_SAME_ACCESS_NT
+                );
+
+                if (!NT_SUCCESS(status))
+                {
+                    throw new NtStatusException(
+                        status,
+                        "Failed to duplicate process handle"
+                    );
+                }
+
+                _processHandle = duplicatedHandle;
+                _logger.Debug("Duplicated and using handle for process {ProcessId}.", _processId);
+            }
+            else
+            {
+                _processHandle = existingHandle;
+                _logger.Debug("Using existing handle for process {ProcessId} (non-duplicated).", _processId);
+            }
+        }
     }
 
     /// <summary>
