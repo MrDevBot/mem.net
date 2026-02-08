@@ -529,21 +529,28 @@ public sealed class Memory : IDisposable
 
     /// <summary>
     /// Deallocates or releases memory in the target process using NtFreeVirtualMemory.
+    /// When using MEM_RELEASE, the size must be zero (the entire region is released).
+    /// When using MEM_DECOMMIT, the size specifies the number of bytes to decommit.
     /// </summary>
     /// <param name="address">The base address of the region to free.</param>
+    /// <param name="size">The number of bytes to free. Must be zero for MEM_RELEASE.</param>
     /// <param name="freeType">The type of free operation (e.g., MEM_RELEASE, MEM_DECOMMIT).</param>
     /// <returns>True if the operation succeeded; otherwise, false.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
+    /// <exception cref="ArgumentException">Thrown if size is non-zero with MEM_RELEASE.</exception>
     /// <exception cref="Win32Exception">Thrown if freeing memory fails.</exception>
-    public bool Dealloc(IntPtr address, FreeType freeType = FreeType.MEM_RELEASE)
+    public bool Dealloc(IntPtr address, int size = 0, FreeType freeType = FreeType.MEM_RELEASE)
     {
         _logger.Debug("Deallocate memory at 0x{Address:X16} with type {FreeType}.", address, freeType);
 
         if (_processHandle == IntPtr.Zero)
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
+        if (freeType == FreeType.MEM_RELEASE && size != 0)
+            throw new ArgumentException("Size must be zero when using MEM_RELEASE.", nameof(size));
+
         IntPtr baseAddress = address;
-        IntPtr regionSize = IntPtr.Zero;
+        IntPtr regionSize = size;
 
         int status = NtFreeVirtualMemory(
             _processHandle,
@@ -591,7 +598,7 @@ public sealed class Memory : IDisposable
         Close();
         GC.SuppressFinalize(this);
     }
-    
+
     // ReSharper disable InconsistentNaming
 
     [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
@@ -677,7 +684,7 @@ public sealed class Memory : IDisposable
     );
 
     // ReSharper restore InconsistentNaming
-    
+
     /// <summary>
     /// Checks if an NTSTATUS code indicates a successful operation.
     /// </summary>
