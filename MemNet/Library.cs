@@ -639,12 +639,21 @@ public sealed class Memory : IDisposable
     /// </summary>
     public void Close()
     {
-        _logger.Debug("Close {ProcessId}.", _processId);
+        lock (_lock)
+        {
+            _logger.Debug("Close {ProcessId}.", _processId);
 
-        if (_processHandle == IntPtr.Zero) return;
+            if (_processHandle == IntPtr.Zero) return;
 
-        CloseHandle(_processHandle);
-        _processHandle = IntPtr.Zero;
+            int status = NtClose(_processHandle);
+            _processHandle = IntPtr.Zero;
+
+            if (!NT_SUCCESS(status))
+            {
+                _logger.Warning("NtClose returned NTSTATUS 0x{Status:X8} for process {ProcessId}.",
+                    status, _processId);
+            }
+        }
     }
 
     /// <summary>
