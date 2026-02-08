@@ -327,79 +327,115 @@ public sealed class Memory : IDisposable
 
     /// <summary>
     /// Searches for a wildcard pattern in the process memory.
+    /// Only committed pages with readable protection are scanned.
     /// </summary>
     /// <param name="pattern">An array of <see cref="Wildcard"/> tokens.</param>
     /// <param name="startAddress">The start address of the search.</param>
     /// <param name="endAddress">The end address of the search.</param>
     /// <param name="chunkSize">The size of each chunk read from the process memory.</param>
     /// <returns>A list of matching addresses.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
     public List<IntPtr> Search(Wildcard[] pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
         if (pattern == null || pattern.Length == 0)
             throw new ArgumentNullException(nameof(pattern), "The search pattern cannot be null or empty.");
 
-        if (startAddress.ToInt64() >= endAddress.ToInt64())
+        long start = startAddress.ToInt64();
+        long end = endAddress.ToInt64();
+
+        if (start >= end)
             throw new ArgumentOutOfRangeException(nameof(startAddress),
                 "Start address must be less than end address.");
 
         if (chunkSize <= 0)
             throw new ArgumentOutOfRangeException(nameof(chunkSize), "Chunk size must be a positive value.");
 
-        if (pattern.Length > chunkSize)
+        int patternLength = pattern.Length;
+
+        if (patternLength > chunkSize)
             throw new ArgumentOutOfRangeException(nameof(pattern), "Pattern is too large for chunk size.");
+        
+        var regions = (from page in Query()
+                       where page.State == MemoryState.MEM_COMMIT && IsReadableProtection(page.Protect)
+                       let regionStart = page.BaseAddress.ToInt64()
+                       let regionEnd = regionStart + (long)page.RegionSize
+                       let clampedStart = Math.Max(regionStart, start)
+                       let clampedEnd = Math.Min(regionEnd, end)
+                       where clampedStart < clampedEnd
+                       select (clampedStart, clampedEnd)).ToList();
+
+        if (regions.Count == 0)
+            return [];
+
+        _logger.Debug("Search scanning {RegionCount} readable regions in 0x{Start:X16}–0x{End:X16}.",
+            regions.Count, start, end);
 
         var matches = new List<IntPtr>();
-        long start = startAddress.ToInt64();
-        long end = endAddress.ToInt64();
-        int patternLength = pattern.Length;
-        long currentOffset = start;
 
-        while (currentOffset < end)
+        foreach (var (regionStart, regionEnd) in regions)
         {
-            long bytesRemaining = end - currentOffset;
-            long bytesToRead = Math.Min(bytesRemaining, chunkSize + patternLength - 1);
-            if (bytesToRead <= 0)
-                break;
+            long offset = regionStart;
+            while (offset < regionEnd)
+            {
+                long remaining = regionEnd - offset;
 
-            byte[] data;
-            try
-            {
-                data = Read((IntPtr)currentOffset, (int)bytesToRead);
-            }
-            catch (Exception ex)
-            {
-                _logger.Debug(
-                    "Search skipping unreadable region at 0x{Address:X16}: {Message}",
-                    currentOffset, ex.Message);
-                currentOffset += chunkSize;
-                continue;
-            }
+                if (patternLength - 1 > int.MaxValue - chunkSize)
+                    throw new ArgumentOutOfRangeException(nameof(pattern),
+                        "Pattern length is too large for safe overlap calculation.");
 
-            for (int i = 0; i <= data.Length - patternLength; i++)
-            {
-                bool match = true;
-                for (int j = 0; j < patternLength; j++)
+                int toRead = (int)Math.Min(remaining, chunkSize + patternLength - 1);
+                if (toRead < patternLength)
+                    break;
+
+                byte[] data;
+                try
                 {
-                    if (!pattern[j].Matches(data[i + j]))
+                    data = Read((IntPtr)offset, toRead);
+                }
+                catch (NtStatusException ex)
+                {
+                    _logger.Debug(
+                        "Search skipping unreadable chunk at 0x{Address:X16}: NTSTATUS=0x{Status:X8}",
+                        offset, ex.NtStatus);
+
+                    if (offset > long.MaxValue - chunkSize) break;
+                    offset += chunkSize;
+                    continue;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    _logger.Debug(
+                        "Search skipping partial read at 0x{Address:X16}: {Message}",
+                        offset, ex.Message);
+
+                    if (offset > long.MaxValue - chunkSize) break;
+                    offset += chunkSize;
+                    continue;
+                }
+
+                for (int i = 0; i <= data.Length - patternLength; i++)
+                {
+                    bool match = true;
+                    for (int j = 0; j < patternLength; j++)
                     {
+                        if (pattern[j].Matches(data[i + j])) continue;
                         match = false;
                         break;
                     }
+
+                    if (!match) continue;
+
+                    if (offset > long.MaxValue - i)
+                    {
+                        _logger.Warning("Search address overflow at 0x{Address:X16} + {Offset}", offset, i);
+                        continue;
+                    }
+
+                    matches.Add((IntPtr)(offset + i));
                 }
 
-                if (match)
-                {
-                    matches.Add((IntPtr)(currentOffset + i));
-                }
+                if (offset > long.MaxValue - chunkSize) break;
+                offset += chunkSize;
             }
-
-            currentOffset += chunkSize;
         }
 
         return matches;
