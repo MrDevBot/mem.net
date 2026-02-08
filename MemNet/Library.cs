@@ -353,7 +353,7 @@ public sealed class Memory : IDisposable
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
         if (size <= 0)
-            throw new ArgumentOutOfRangeException(nameof(size), "Size must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(size), "Size must be a positive value.");
 
         byte[] buffer = new byte[size];
         GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
