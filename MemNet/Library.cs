@@ -246,53 +246,64 @@ public sealed class Memory : IDisposable
     /// <summary>
     /// Enumerates memory pages in the target process.
     /// </summary>
-    /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="MemoryPageInformation"/> describing the process pages.</returns>
+    /// <returns>A list of <see cref="MemoryPageInformation"/> describing the process pages.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    public IEnumerable<MemoryPageInformation> Query()
+    public List<MemoryPageInformation> Query()
     {
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        var address = IntPtr.Zero;
-        var sizeOfMbi = Marshal.SizeOf<MEMORY_BASIC_INFORMATION>();
-
-        while (true)
+        lock (_lock)
         {
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            var pages = new List<MemoryPageInformation>();
+            var address = IntPtr.Zero;
+            var sizeOfMbi = Marshal.SizeOf<MEMORY_BASIC_INFORMATION>();
+
             IntPtr pMbi = Marshal.AllocHGlobal(sizeOfMbi);
             try
             {
-                int status = NtQueryVirtualMemory(
-                    _processHandle,
-                    address,
-                    0, // MemoryBasicInformation
-                    pMbi,
-                    sizeOfMbi,
-                    out var returnedBytes
-                );
-
-                if (!NT_SUCCESS(status) || returnedBytes.ToInt64() == 0)
-                    break;
-
-                MEMORY_BASIC_INFORMATION mbi = Marshal.PtrToStructure<MEMORY_BASIC_INFORMATION>(pMbi);
-                yield return new MemoryPageInformation
+                while (true)
                 {
-                    BaseAddress = mbi.BaseAddress,
-                    AllocationBase = mbi.AllocationBase,
-                    AllocationProtect = (MemoryProtection)mbi.AllocationProtect,
-                    RegionSize = (ulong)mbi.RegionSize.ToInt64(),
-                    State = (MemoryState)mbi.State,
-                    Protect = (MemoryProtection)mbi.Protect,
-                    Type = (MemoryType)mbi.Type
-                };
+                    int status = NtQueryVirtualMemory(
+                        _processHandle,
+                        address,
+                        MEMORY_BASIC_INFORMATION_CLASS,
+                        pMbi,
+                        sizeOfMbi,
+                        out var returnedBytes
+                    );
 
-                long nextAddress = mbi.BaseAddress.ToInt64() + mbi.RegionSize.ToInt64();
-                if (nextAddress < 0) break;
-                address = (IntPtr)nextAddress;
+                    if (!NT_SUCCESS(status) || returnedBytes.ToInt64() == 0)
+                        break;
+
+                    MEMORY_BASIC_INFORMATION mbi = Marshal.PtrToStructure<MEMORY_BASIC_INFORMATION>(pMbi);
+                    pages.Add(new MemoryPageInformation
+                    {
+                        BaseAddress = mbi.BaseAddress,
+                        AllocationBase = mbi.AllocationBase,
+                        AllocationProtect = (MemoryProtection)mbi.AllocationProtect,
+                        RegionSize = (ulong)mbi.RegionSize.ToInt64(),
+                        State = (MemoryState)mbi.State,
+                        Protect = (MemoryProtection)mbi.Protect,
+                        Type = (MemoryType)mbi.Type
+                    });
+
+                    long baseAddr = mbi.BaseAddress.ToInt64();
+                    long regionSize = mbi.RegionSize.ToInt64();
+
+                    if (baseAddr > long.MaxValue - regionSize)
+                        break;
+
+                    long nextAddress = baseAddr + regionSize;
+                    address = (IntPtr)nextAddress;
+                }
             }
             finally
             {
                 Marshal.FreeHGlobal(pMbi);
             }
+
+            return pages;
         }
     }
 
