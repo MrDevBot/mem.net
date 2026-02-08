@@ -700,7 +700,7 @@ public sealed class Memory : IDisposable
                 throw new ArgumentOutOfRangeException(nameof(size), "Size must be a positive value.");
 
             IntPtr baseAddress = address;
-            IntPtr regionSize = (IntPtr)size;
+            IntPtr regionSize = size;
 
             int status = NtProtectVirtualMemory(
                 _processHandle,
@@ -805,7 +805,7 @@ public sealed class Memory : IDisposable
                 throw new ArgumentException("Size must be zero when using MEM_RELEASE.", nameof(size));
 
             IntPtr baseAddress = address;
-            IntPtr regionSize = (IntPtr)size;
+            IntPtr regionSize = size;
 
             int status = NtFreeVirtualMemory(
                 _processHandle,
