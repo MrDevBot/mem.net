@@ -157,58 +157,90 @@ public sealed class Memory : IDisposable
     {
         lock (_lock)
         {
-            EnsureOpen();
-            return EnumerateModulesViaPeb();
-        }
-    }
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
-        var modules = new List<ModuleInfo>();
-        IntPtr[] moduleHandles = new IntPtr[1024];
-        uint cb = (uint)(IntPtr.Size * moduleHandles.Length);
+            // Inline QueryProcessBasicInformation
+            int pbiSize = Marshal.SizeOf<PROCESS_BASIC_INFORMATION>();
+            IntPtr pbiPtr = Marshal.AllocHGlobal(pbiSize);
+            PROCESS_BASIC_INFORMATION pbi;
 
-        if (!EnumProcessModulesEx(_processHandle, moduleHandles, cb, out var lpcbNeeded, 0x03))
-        {
-            throw new Win32Exception(
-                Marshal.GetLastWin32Error(),
-                $"Failed to enumerate process modules for process {_processId}."
-            );
-        }
-
-        if (lpcbNeeded > cb)
-        {
-            moduleHandles = new IntPtr[lpcbNeeded / (uint)IntPtr.Size];
-            cb = lpcbNeeded;
-
-            if (!EnumProcessModulesEx(_processHandle, moduleHandles, cb, out lpcbNeeded, 0x03))
+            try
             {
-                throw new Win32Exception(
-                    Marshal.GetLastWin32Error(),
-                    $"Failed to enumerate process modules for process {_processId}."
+                int status = NtQueryInformationProcess(
+                    _processHandle,
+                    ProcessBasicInformation,
+                    pbiPtr,
+                    pbiSize,
+                    out _
                 );
-            }
-        }
 
-        int numModules = (int)(lpcbNeeded / (uint)IntPtr.Size);
-        for (int i = 0; i < numModules; i++)
-        {
-            StringBuilder moduleName = new StringBuilder(256);
-            if (GetModuleBaseName(_processHandle, moduleHandles[i], moduleName, (uint)moduleName.Capacity) == 0)
-                continue;
-
-            if (GetModuleInformation(_processHandle, moduleHandles[i], out MODULEINFO moduleInfo,
-                    (uint)Marshal.SizeOf<MODULEINFO>()))
-            {
-                modules.Add(new ModuleInfo
+                if (!NT_SUCCESS(status))
                 {
-                    ModuleName = moduleName.ToString(),
-                    Base = moduleInfo.lpBaseOfDll,
-                    SizeOfImage = moduleInfo.SizeOfImage,
-                    EntryPoint = moduleInfo.EntryPoint
-                });
-            }
-        }
+                    throw new NtStatusException(
+                        status,
+                        $"Failed to query process basic information for process {_processId}"
+                    );
+                }
 
-        return modules;
+                pbi = Marshal.PtrToStructure<PROCESS_BASIC_INFORMATION>(pbiPtr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(pbiPtr);
+            }
+
+            // Inline EnumerateModulesViaPeb
+            if (pbi.PebBaseAddress == IntPtr.Zero)
+                throw new InvalidOperationException("PEB base address is null");
+
+            // Calls public Read<T>, which handles re-entrant locking
+            PEB peb = Read<PEB>(pbi.PebBaseAddress);
+
+            if (peb.Ldr == IntPtr.Zero)
+                throw new InvalidOperationException("PEB_LDR_DATA pointer is null");
+
+            PEB_LDR_DATA ldr = Read<PEB_LDR_DATA>(peb.Ldr);
+
+            IntPtr currentEntry = ldr.InLoadOrderModuleList.Flink;
+            IntPtr listHead = peb.Ldr + PEB_LDR_IN_LOAD_ORDER_MODULE_LIST_OFFSET;
+
+            var modules = new List<ModuleInfo>();
+            const int maxIterations = 1000;
+            int iterations = 0;
+
+            while (currentEntry != IntPtr.Zero && currentEntry != listHead && iterations < maxIterations)
+            {
+                iterations++;
+
+                try
+                {
+                    LDR_DATA_TABLE_ENTRY entry = Read<LDR_DATA_TABLE_ENTRY>(currentEntry);
+
+                    // Re-entrant call to public Read(IntPtr, int) via delegate
+                    string moduleName = entry.BaseDllName.ReadString(Read);
+
+                    if (!string.IsNullOrEmpty(moduleName))
+                    {
+                        modules.Add(new ModuleInfo
+                        {
+                            ModuleName = moduleName,
+                            Base = entry.DllBase,
+                            EntryPoint = entry.EntryPoint,
+                            SizeOfImage = entry.SizeOfImage
+                        });
+                    }
+
+                    currentEntry = entry.InLoadOrderLinks.Flink;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+
+            return modules;
+        }
     }
 
     /// <summary>
