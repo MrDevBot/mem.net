@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Runtime.InteropServices;
 using MemNet.Enum;
 using MemNet.Enum.Managed;
 using MemNet.Native;
@@ -315,9 +313,6 @@ public sealed class Memory : IDisposable
     /// <param name="endAddress">The end address of the search.</param>
     /// <param name="chunkSize">The size of each chunk read from the process memory.</param>
     /// <returns>A list of matching addresses.</returns>
-    /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
     public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
         var patternTokens = pattern.Split(' ');
