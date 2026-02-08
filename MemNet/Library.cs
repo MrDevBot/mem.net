@@ -53,28 +53,45 @@ public sealed class Memory : IDisposable
     }
 
     /// <summary>
-    /// Opens the target process with the specified access rights.
+    /// Opens the target process with the specified access rights using NtOpenProcess.
     /// </summary>
     /// <param name="processAccessRights">The desired access rights.</param>
-    /// <exception cref="Win32Exception">Thrown if the process cannot be opened.</exception>
+    /// <exception cref="NtStatusException">Thrown if the process cannot be opened.</exception>
     public void Open(
         ProcessAccessRights processAccessRights = ProcessAccessRights.PROCESS_VM_READ |
                                                   ProcessAccessRights.PROCESS_VM_WRITE |
                                                   ProcessAccessRights.PROCESS_QUERY_INFORMATION |
                                                   ProcessAccessRights.PROCESS_VM_OPERATION)
     {
-        if (_processHandle != IntPtr.Zero)
-            Close();
-
-        _processHandle = OpenProcess((uint)processAccessRights, false, _processId);
-        _logger.Debug("Opened {ProcessId} with {AccessRights}.", _processId, processAccessRights);
-
-        if (_processHandle == IntPtr.Zero)
+        lock (_lock)
         {
-            throw new Win32Exception(
-                Marshal.GetLastWin32Error(),
-                $"Failed to open process with ID {_processId}."
+            if (_processHandle != IntPtr.Zero)
+                CloseInternal();
+
+            var clientId = new CLIENT_ID
+            {
+                UniqueProcess = _processId,
+                UniqueThread = IntPtr.Zero
+            };
+
+            var objectAttributes = OBJECT_ATTRIBUTES.Create();
+
+            int status = NtOpenProcess(
+                out _processHandle,
+                (uint)processAccessRights,
+                ref objectAttributes,
+                ref clientId
             );
+
+            if (!NT_SUCCESS(status))
+            {
+                throw new NtStatusException(
+                    status,
+                    $"Failed to open process with ID {_processId}"
+                );
+            }
+
+            _logger.Debug("Opened {ProcessId} with {AccessRights}.", _processId, processAccessRights);
         }
     }
 
