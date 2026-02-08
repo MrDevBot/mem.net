@@ -30,6 +30,18 @@ public sealed class Memory : IDisposable
     private readonly ILogger _logger;
 
     /// <summary>
+    /// Lock for thread-safe access to process handle and operations.
+    /// </summary>
+    private readonly object _lock = new();
+
+    // ReSharper disable InconsistentNaming
+    private const int MEMORY_BASIC_INFORMATION_CLASS = 0;
+    private const uint DUPLICATE_SAME_ACCESS_NT = 0x00000002;
+    private const int ProcessBasicInformation = 0;
+    private const int PEB_LDR_IN_LOAD_ORDER_MODULE_LIST_OFFSET = 0x10;
+    // ReSharper restore InconsistentNaming
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Memory"/> class.
     /// </summary>
     /// <param name="processId">Process ID of the target process.</param>
