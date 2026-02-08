@@ -549,47 +549,49 @@ public sealed class Memory : IDisposable
     /// <param name="protection">The memory protection flags for the allocated region.</param>
     /// <returns>An IntPtr to the base address of the newly allocated region.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="Win32Exception">Thrown if allocation fails.</exception>
+    /// <exception cref="NtStatusException">Thrown if allocation fails.</exception>
     public IntPtr Alloc(int size, IntPtr address = default,
         AllocationType allocationType = AllocationType.MEM_COMMIT | AllocationType.MEM_RESERVE,
         MemoryProtection protection = MemoryProtection.PAGE_READWRITE)
     {
-        _logger.Debug(
-            "Allocate {Size} bytes at {AddressString} with type {AllocationType} and protection {Protection}.",
-            size,
-            address == IntPtr.Zero ? "System Determined Address" : $"0x{address:X16}",
-            allocationType,
-            protection);
-
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        IntPtr baseAddress = address;
-        IntPtr regionSize = size;
-
-        int status = NtAllocateVirtualMemory(
-            _processHandle,
-            ref baseAddress,
-            IntPtr.Zero,
-            ref regionSize,
-            (uint)allocationType,
-            (uint)protection
-        );
-
-        if (!NT_SUCCESS(status))
+        lock (_lock)
         {
-            throw new Win32Exception(
-                $"NtAllocateVirtualMemory failed, NTSTATUS=0x{status:X8}, size={size}, process={_processId}."
+            _logger.Debug(
+                "Allocate {Size} bytes at {AddressString} with type {AllocationType} and protection {Protection}.",
+                size,
+                address == IntPtr.Zero ? "System Determined Address" : $"0x{address:X16}",
+                allocationType,
+                protection);
+
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            IntPtr baseAddress = address;
+            IntPtr regionSize = size;
+
+            int status = NtAllocateVirtualMemory(
+                _processHandle,
+                ref baseAddress,
+                IntPtr.Zero,
+                ref regionSize,
+                (uint)allocationType,
+                (uint)protection
             );
+
+            if (!NT_SUCCESS(status))
+            {
+                throw new NtStatusException(
+                    status,
+                    $"NtAllocateVirtualMemory failed for size={size}, process={_processId}"
+                );
+            }
+
+            _logger.Debug(
+                "NtAllocateVirtualMemory returned base=0x{0:X16}, size={1}",
+                baseAddress.ToInt64(), regionSize);
+
+            return baseAddress;
         }
-
-        _logger.Debug(
-            "NtAllocateVirtualMemory returned base=0x{0:X16}, size={1}",
-            baseAddress.ToInt64(),
-            regionSize
-        );
-
-        return baseAddress;
     }
 
     /// <summary>
@@ -603,35 +605,37 @@ public sealed class Memory : IDisposable
     /// <returns>True if the operation succeeded; otherwise, false.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentException">Thrown if size is non-zero with MEM_RELEASE.</exception>
-    /// <exception cref="Win32Exception">Thrown if freeing memory fails.</exception>
-    public bool Dealloc(IntPtr address, int size = 0, FreeType freeType = FreeType.MEM_RELEASE)
+    /// <exception cref="NtStatusException">Thrown if freeing memory fails.</exception>
+    public void Dealloc(IntPtr address, int size = 0, FreeType freeType = FreeType.MEM_RELEASE)
     {
-        _logger.Debug("Deallocate memory at 0x{Address:X16} with type {FreeType}.", address, freeType);
-
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        if (freeType == FreeType.MEM_RELEASE && size != 0)
-            throw new ArgumentException("Size must be zero when using MEM_RELEASE.", nameof(size));
-
-        IntPtr baseAddress = address;
-        IntPtr regionSize = size;
-
-        int status = NtFreeVirtualMemory(
-            _processHandle,
-            ref baseAddress,
-            ref regionSize,
-            (uint)freeType
-        );
-
-        if (!NT_SUCCESS(status))
+        lock (_lock)
         {
-            throw new Win32Exception(
-                $"NtFreeVirtualMemory failed, NTSTATUS=0x{status:X8}, address=0x{address:X16}, freeType={freeType}."
-            );
-        }
+            _logger.Debug("Deallocate memory at 0x{Address:X16} with type {FreeType}.", address, freeType);
 
-        return true;
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            if (freeType == FreeType.MEM_RELEASE && size != 0)
+                throw new ArgumentException("Size must be zero when using MEM_RELEASE.", nameof(size));
+
+            IntPtr baseAddress = address;
+            IntPtr regionSize = (IntPtr)size;
+
+            int status = NtFreeVirtualMemory(
+                _processHandle,
+                ref baseAddress,
+                ref regionSize,
+                (uint)freeType
+            );
+
+            if (!NT_SUCCESS(status))
+            {
+                throw new NtStatusException(
+                    status,
+                    $"NtFreeVirtualMemory failed at address=0x{address:X16}, freeType={freeType}"
+                );
+            }
+        }
     }
 
     /// <summary>
