@@ -66,7 +66,7 @@ public sealed class Memory : IDisposable
         lock (_lock)
         {
             if (_processHandle != IntPtr.Zero)
-                CloseInternal();
+                Close();
 
             var clientId = new CLIENT_ID
             {
