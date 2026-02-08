@@ -688,6 +688,46 @@ public sealed class Memory : IDisposable
         }
     }
 
+    /// <summary>
+    /// Changes the memory protection on a region of committed pages in the target process.
+    /// </summary>
+    public MemoryProtection Protect(IntPtr address, int size,
+        MemoryProtection newProtection = MemoryProtection.PAGE_EXECUTE_READWRITE)
+    {
+        lock (_lock)
+        {
+            _logger.Debug("Protect 0x{Address:X16} ({Size} bytes) with {Protection}.", address, size, newProtection);
+
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException(nameof(size), "Size must be a positive value.");
+
+            IntPtr baseAddress = address;
+            IntPtr regionSize = (IntPtr)size;
+
+            int status = NtProtectVirtualMemory(
+                _processHandle,
+                ref baseAddress,
+                ref regionSize,
+                (uint)newProtection,
+                out uint oldProtection
+            );
+
+            if (!NT_SUCCESS(status))
+            {
+                throw new NtStatusException(
+                    status,
+                    $"NtProtectVirtualMemory failed at address 0x{address:X16}"
+                );
+            }
+
+            _logger.Debug(
+                "Protection changed at 0x{Address:X16}: 0x{Old:X} → 0x{New:X}",
+                baseAddress.ToInt64(), oldProtection, (uint)newProtection);
+
+            return (MemoryProtection)oldProtection;
         }
     }
 
