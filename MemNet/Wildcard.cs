@@ -13,8 +13,19 @@ public readonly struct Wildcard
         if (token.Length != 2)
             throw new ArgumentException($"Token must be exactly 2 characters, got {token.Length}: '{token}'", nameof(token));
 
-        _highNibble = token[0] == '?' ? null : Convert.ToInt32(token[0].ToString(), 16);
-        _lowNibble = token[1] == '?' ? null : Convert.ToInt32(token[1].ToString(), 16);
+        _highNibble = ParseNibble(token[0], nameof(token));
+        _lowNibble = ParseNibble(token[1], nameof(token));
+    }
+
+    private static int? ParseNibble(char c, string paramName)
+    {
+        if (c == '?')
+            return null;
+
+        if (c is (>= '0' and <= '9') or (>= 'A' and <= 'F') or (>= 'a' and <= 'f'))
+            return Convert.ToInt32(c.ToString(), 16);
+
+        throw new ArgumentException($"Invalid hex character '{c}'. Expected 0-9, A-F, a-f, or '?' for wildcard.", paramName);
     }
 
     public bool Matches(byte b)

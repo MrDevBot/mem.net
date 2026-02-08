@@ -25,8 +25,8 @@ static class Program
         
         IntPtr startAddr = IntPtr.Subtract(localPlayerPtr, 20);
         
-        var region = mem.Read(startAddr, 20 + sizeof(IntPtr) + 20);
-        var ptr = mem.Read(localPlayerPtr, sizeof(IntPtr));
+        var region = mem.Read(startAddr, 20 + IntPtr.Size + 20);
+        var ptr = mem.Read(localPlayerPtr, IntPtr.Size);
         
         
         Log.Information("Region: {Region}", BitConverter.ToString(region));

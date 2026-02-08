@@ -202,16 +202,17 @@ public sealed class Memory : IDisposable
     /// <param name="chunkSize">The size of each chunk read from the process memory.</param>
     /// <returns>A list of matching addresses.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="ArgumentNullException">Thrown if the pattern is null or empty.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if the pattern is null.</exception>
+    /// <exception cref="ArgumentException">Thrown if the pattern is empty or contains no valid tokens.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if addresses or chunk size are invalid.</exception>
     public List<IntPtr> Search(string pattern, IntPtr startAddress, IntPtr endAddress, int chunkSize = 8192)
     {
-        if (string.IsNullOrWhiteSpace(pattern))
-            throw new ArgumentNullException(nameof(pattern), "The search pattern cannot be null or empty.");
+        if (pattern is null)
+            throw new ArgumentNullException(nameof(pattern), "The search pattern cannot be null.");
 
         var patternTokens = pattern.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (patternTokens.Length == 0)
-            throw new ArgumentException("The search pattern contains no valid tokens.", nameof(pattern));
+            throw new ArgumentException("The search pattern is empty or contains only whitespace.", nameof(pattern));
 
         var wildcards = patternTokens.Select(token => new Wildcard(token)).ToArray();
         return Search(wildcards, startAddress, endAddress, chunkSize);
