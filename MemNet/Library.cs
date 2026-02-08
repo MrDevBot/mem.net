@@ -426,7 +426,8 @@ public sealed class Memory : IDisposable
     /// <param name="address">The address to write to.</param>
     /// <param name="buffer">The data to write.</param>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown if the buffer length is invalid.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if the buffer is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown if the buffer is empty.</exception>
     /// <exception cref="Win32Exception">Thrown if the write operation fails.</exception>
     /// <exception cref="InvalidOperationException">Thrown if fewer bytes are written than requested.</exception>
     public void Write(IntPtr address, byte[] buffer)
@@ -436,11 +437,14 @@ public sealed class Memory : IDisposable
         if (_processHandle == IntPtr.Zero)
             throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
-        if (buffer.Length <= 0)
-            throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer must be non-negative.");
+        if (buffer is null)
+            throw new ArgumentNullException(nameof(buffer), "Buffer cannot be null.");
+
+        if (buffer.Length == 0)
+            throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer must not be empty.");
 
         GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-            
+
         try
         {
             int status = NtWriteVirtualMemory(
