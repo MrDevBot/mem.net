@@ -188,7 +188,7 @@ public sealed class Memory : IDisposable
                     Type = (MemoryType)mbi.Type
                 };
 
-                long nextAddress = mbi.BaseAddress.ToInt64() + mbi.RegionSize;
+                long nextAddress = mbi.BaseAddress.ToInt64() + mbi.RegionSize.ToInt64();
                 if (nextAddress < 0) break;
                 address = (IntPtr)nextAddress;
             }
