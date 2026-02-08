@@ -530,50 +530,54 @@ public sealed class Memory : IDisposable
     /// <returns>A byte array containing the data read from memory.</returns>
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the size is invalid.</exception>
-    /// <exception cref="Win32Exception">Thrown if the read operation fails.</exception>
+    /// <exception cref="NtStatusException">Thrown if the read operation fails.</exception>
     /// <exception cref="InvalidOperationException">Thrown if fewer bytes are read than requested.</exception>
     public byte[] Read(IntPtr address, int size)
     {
-        _logger.Debug("Read {Size} bytes from 0x{Address:X16}.", size, address);
-
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        if (size <= 0)
-            throw new ArgumentOutOfRangeException(nameof(size), "Size must be a positive value.");
-
-        byte[] buffer = new byte[size];
-        GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-        try
+        lock (_lock)
         {
-            int status = NtReadVirtualMemory(
-                _processHandle,
-                address,
-                gcHandle.AddrOfPinnedObject(),
-                size,
-                out int bytesRead
-            );
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
-            if (!NT_SUCCESS(status))
+            _logger.Debug("Read {Size} bytes from 0x{Address:X16}.", size, address);
+
+            if (size <= 0)
+                throw new ArgumentOutOfRangeException(nameof(size), "Size must be a positive value.");
+
+            byte[] buffer = new byte[size];
+            GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
             {
-                throw new Win32Exception(
-                    $"NtReadVirtualMemory failed, NTSTATUS=0x{status:X8}, address=0x{address:X16}"
+                int status = NtReadVirtualMemory(
+                    _processHandle,
+                    address,
+                    gcHandle.AddrOfPinnedObject(),
+                    size,
+                    out int bytesRead
                 );
+
+                if (!NT_SUCCESS(status))
+                {
+                    throw new NtStatusException(
+                        status,
+                        $"NtReadVirtualMemory failed at address 0x{address:X16}"
+                    );
+                }
+
+                if (bytesRead != size)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to read {size} bytes at 0x{address:X16}. Only {bytesRead} were read."
+                    );
+                }
+            }
+            finally
+            {
+                gcHandle.Free();
             }
 
-            if (bytesRead != size)
-            {
-                throw new InvalidOperationException(
-                    $"Failed to read {size} bytes at 0x{address:X16}. Only {bytesRead} were read."
-                );
-            }
+            return buffer;
         }
-        finally
-        {
-            gcHandle.Free();
-        }
-
-        return buffer;
     }
 
     /// <summary>
