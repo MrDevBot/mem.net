@@ -589,26 +589,47 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     public void Write<T>(IntPtr address, T value) where T : struct
     {
-        _logger.Debug("Write {Type} to 0x{Address:X16}.", typeof(T), address);
-
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        int size = Marshal.SizeOf<T>();
-        byte[] buffer = new byte[size];
-
-        IntPtr ptr = Marshal.AllocHGlobal(size);
-        try
+        lock (_lock)
         {
-            Marshal.StructureToPtr(value, ptr, false);
-            Marshal.Copy(ptr, buffer, 0, size);
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(ptr);
-        }
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
-        Write(address, buffer);
+            _logger.Debug("Write {Type} to 0x{Address:X16}.", typeof(T), address);
+
+            int size = Marshal.SizeOf<T>();
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(value, ptr, false);
+
+                int status = NtWriteVirtualMemory(
+                    _processHandle,
+                    address,
+                    ptr,
+                    size,
+                    out int bytesWritten
+                );
+
+                if (!NT_SUCCESS(status))
+                {
+                    throw new NtStatusException(
+                        status,
+                        $"NtWriteVirtualMemory failed at address 0x{address:X16}"
+                    );
+                }
+
+                if (bytesWritten != size)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to write {size} bytes at 0x{address:X16}. Only {bytesWritten} were written."
+                    );
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(ptr);
+            }
+        }
     }
 
     /// <summary>
@@ -619,50 +640,54 @@ public sealed class Memory : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if the process is not open.</exception>
     /// <exception cref="ArgumentNullException">Thrown if the buffer is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if the buffer is empty.</exception>
-    /// <exception cref="Win32Exception">Thrown if the write operation fails.</exception>
-    /// <exception cref="InvalidOperationException">Thrown if fewer bytes are written than requested.</exception>
     public void Write(IntPtr address, byte[] buffer)
     {
-        _logger.Debug("Write {Size} bytes to 0x{Address:X16}.", buffer.Length, address);
-
-        if (_processHandle == IntPtr.Zero)
-            throw new InvalidOperationException($"Process with ID {_processId} is not open.");
-
-        if (buffer is null)
-            throw new ArgumentNullException(nameof(buffer), "Buffer cannot be null.");
-
-        if (buffer.Length == 0)
-            throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer must not be empty.");
-
-        GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-
-        try
+        lock (_lock)
         {
-            int status = NtWriteVirtualMemory(
-                _processHandle,
-                address,
-                gcHandle.AddrOfPinnedObject(),
-                buffer.Length,
-                out int bytesWritten
-            );
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
 
-            if (!NT_SUCCESS(status))
+            _logger.Debug("Write {Size} bytes to 0x{Address:X16}.", buffer?.Length ?? 0, address);
+
+            if (buffer is null)
+                throw new ArgumentNullException(nameof(buffer), "Buffer cannot be null.");
+
+            if (buffer.Length == 0)
+                throw new ArgumentOutOfRangeException(nameof(buffer), "Buffer must not be empty.");
+
+            GCHandle gcHandle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
             {
-                throw new Win32Exception(
-                    $"NtWriteVirtualMemory failed, NTSTATUS=0x{status:X8}, address=0x{address:X16}"
+                int status = NtWriteVirtualMemory(
+                    _processHandle,
+                    address,
+                    gcHandle.AddrOfPinnedObject(),
+                    buffer.Length,
+                    out int bytesWritten
                 );
+
+                if (!NT_SUCCESS(status))
+                {
+                    throw new NtStatusException(
+                        status,
+                        $"NtWriteVirtualMemory failed at address 0x{address:X16}"
+                    );
+                }
+
+                if (bytesWritten != buffer.Length)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to write {buffer.Length} bytes at 0x{address:X16}. Only {bytesWritten} were written."
+                    );
+                }
             }
-
-            if (bytesWritten != buffer.Length)
+            finally
             {
-                throw new InvalidOperationException(
-                    $"Failed to write {buffer.Length} bytes at 0x{address:X16}. Only {bytesWritten} were written."
-                );
+                gcHandle.Free();
             }
         }
-        finally
-        {
-            gcHandle.Free();
+    }
+
         }
     }
 
