@@ -109,6 +109,20 @@ public sealed class Memory : IDisposable
             );
         }
 
+        if (lpcbNeeded > cb)
+        {
+            moduleHandles = new IntPtr[lpcbNeeded / (uint)IntPtr.Size];
+            cb = lpcbNeeded;
+
+            if (!EnumProcessModulesEx(_processHandle, moduleHandles, cb, out lpcbNeeded, 0x03))
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    $"Failed to enumerate process modules for process {_processId}."
+                );
+            }
+        }
+
         int numModules = (int)(lpcbNeeded / (uint)IntPtr.Size);
         for (int i = 0; i < numModules; i++)
         {
@@ -128,6 +142,7 @@ public sealed class Memory : IDisposable
                 });
             }
         }
+
         return modules;
     }
 
