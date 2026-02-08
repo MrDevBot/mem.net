@@ -500,7 +500,26 @@ public sealed class Memory : IDisposable
     /// <returns>The final pointer after applying all offsets.</returns>
     public IntPtr Dereference(IntPtr address, int[] offsets)
     {
-        return offsets.Aggregate(address, (current, offset) => Read<IntPtr>(current) + offset);
+        lock (_lock)
+        {
+            if (_processHandle == IntPtr.Zero)
+                throw new InvalidOperationException($"Process with ID {_processId} is not open.");
+
+            return offsets.Aggregate(address, (current, offset) =>
+            {
+                // Re-entrant lock: Calls public Read<IntPtr>
+                IntPtr ptr = Read<IntPtr>(current);
+                long ptrValue = ptr.ToInt64();
+
+                if (offset > 0 && ptrValue > long.MaxValue - offset)
+                    throw new OverflowException($"Pointer arithmetic overflow: 0x{ptrValue:X16} + {offset}");
+
+                if (offset < 0 && ptrValue < long.MinValue - offset)
+                    throw new OverflowException($"Pointer arithmetic underflow: 0x{ptrValue:X16} + {offset}");
+
+                return ptr + offset;
+            });
+        }
     }
 
     /// <summary>
